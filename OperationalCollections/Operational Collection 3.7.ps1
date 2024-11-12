@@ -1081,7 +1081,7 @@ $DummyObject |
 Select-Object @{L="Name"
 ; E={"Workstations | Windows 11"}},@{L="Query"
 ; E={"select SMS_R_System.ResourceID,SMS_R_System.ResourceType,SMS_R_System.Name,SMS_R_System.SMSUniqueIdentifier,SMS_R_System.ResourceDomainORWorkgroup,SMS_R_System.Client from SMS_R_System
- where SMS_R_System.Build like '10.0.22%'"}},@{L="LimitingCollection"
+ where SMS_R_System.Build like '10.0.2%'"}},@{L="LimitingCollection"
 ; E={"Workstations | All"}},@{L="Comment"
 ; E={"All workstations with Windows 11 operating system"}}
 
