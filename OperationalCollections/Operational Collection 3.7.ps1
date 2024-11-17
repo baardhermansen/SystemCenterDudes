@@ -18,7 +18,7 @@
 # 2015/08/06 - Change collection 22 query
 # 2015/08/12 - Added Windows 10 - Collection 45
 # 2015/11/10 - Changed collection 4 to SP1 CU2 instead of CU1, Add collection 46
-# 2015/12/04 - Changed collection 4 to SCCM 1511 instead of CU2, Add collection 47
+# 2015/12/04 - Changed collection 4 to CM 1511 instead of CU2, Add collection 47
 # 2016/02/16 - Add collection 48 and 49. Complete Revamp of Collections naming. Comment added on all collections
 # 2016/03/03 - Add collection 51
 # 2016/03/14 - Add collection 52
@@ -45,8 +45,9 @@
 # 2021/11/22 - Add Collection 100-133
 # 2022/08/24 - Add Collection 133-148
 # 2024/11/07 - Add Collection 149-155
+# 2024/11/16 - Big rewrite of the script - Baard Hermansen
 #
-# Purpose : This script create a set of SCCM collections and move it in an "Operational" folder
+# Purpose : This script create a set of CM collections and move it in an "Operational" folder
 # Special Thanks to Joshua Barnette for V3.0
 #
 #############################################################################
@@ -70,6 +71,9 @@ $FolderPath = Get-CMFolder -FolderPath ("DeviceCollection" + '\' + $CollectionFo
 #Set Default limiting collections
 $LimitingCollection = "All Systems"
 
+# This query is the base for nearly all collections
+$queryBase = "SELECT SMS_R_SYSTEM.ResourceID,SMS_R_SYSTEM.ResourceType,SMS_R_SYSTEM.Name,SMS_R_SYSTEM.SMSUniqueIdentifier,SMS_R_SYSTEM.ResourceDomainORWorkgroup,SMS_R_SYSTEM.Client FROM SMS_R_System"
+
 #Refresh Schedule
 $Schedule = New-CMSchedule -RecurInterval Days -RecurCount 7
 
@@ -77,550 +81,500 @@ $Schedule = New-CMSchedule -RecurInterval Days -RecurCount 7
 $ExistingCollections = Get-CMDeviceCollection -Name "* | *" | Select-Object CollectionID, Name
 
 #List of Collections Query
-$DummyObject = New-Object -TypeName PSObject
 $Collections = @()
 
-$queryBase = "SELECT SMS_R_SYSTEM.ResourceID,SMS_R_SYSTEM.ResourceType,SMS_R_SYSTEM.Name,SMS_R_SYSTEM.SMSUniqueIdentifier,SMS_R_SYSTEM.ResourceDomainORWorkgroup,SMS_R_SYSTEM.Client FROM SMS_R_System"
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients | All" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.Client = 1" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All devices detected by SCCM" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients | No" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.Client = 0 OR SMS_R_System.Client is NULL" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All devices without SCCM client installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | Not Latest (2207)" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion not like '5.00.9088.10%'" }},
-    @{L     = "LimitingCollection" ; E = { "Clients | All" }},
-    @{L     = "Comment" ; E = { "All devices without SCCM client version 2207" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | R2 CU1" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion = '5.00.7958.1203'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version R2 CU1 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | R2 CU2" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion = '5.00.7958.1303'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version R2 CU2 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | R2 CU3" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.7958.14%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version R2 CU3 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | R2 CU4" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion = '5.00.7958.1501'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version R2 CU4 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | R2 CU5" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion = '5.00.7958.1604'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version R2 CU5 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | R2 CU0" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion = '5.00.7958.1000'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version R2 CU0 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | R2 SP1" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion = '5.00.8239.1000'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version R2 SP1 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | R2 SP1 CU1" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion = '5.00.8239.1203'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version R2 SP1 CU1 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | R2 SP1 CU2" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion = '5.00.8239.1301'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version R2 SP1 CU2 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | R2 SP1 CU3" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion = '5.00.8239.1403'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version R2 SP1 CU3 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 1511" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion = '5.00.8325.1000'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version 1511 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 1602" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion = '5.00.8355.1000'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version 1602 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 1606" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.8412.100%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version 1606 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 1610" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.8458.100%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version 1610 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 1702" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.8498.100%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version 1702 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 1706" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.8540.100%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version 1706 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 1710" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.8577.100%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version 1710 installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Hardware Inventory | Clients Not Reporting since 14 Days" } },
-    @{L     = "Query" ; E = { "$queryBase where ResourceId in (select SMS_R_System.ResourceID from SMS_R_System inner join SMS_G_System_WORKSTATION_STATUS on SMS_G_System_WORKSTATION_STATUS.ResourceID = SMS_R_System.ResourceId where DATEDIFF(dd,SMS_G_System_WORKSTATION_STATUS.LastHardwareScan,GetDate())
- > 14)"}},
-    @{L     = "LimitingCollection" ; E = { "Clients | All" }},
-    @{L     = "Comment" ; E = { "All devices with SCCM client that have not communicated with hardware inventory over 14 days" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Laptops | All" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_SYSTEM_ENCLOSURE on SMS_G_System_SYSTEM_ENCLOSURE.ResourceID = SMS_R_System.ResourceId where SMS_G_System_SYSTEM_ENCLOSURE.ChassisTypes in ('8', '9', '10', '11', '12', '14', '18', '21')" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All laptops" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Laptops | Dell" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_COMPUTER_SYSTEM on SMS_G_System_COMPUTER_SYSTEM.ResourceId = SMS_R_System.ResourceId where SMS_G_System_COMPUTER_SYSTEM.Manufacturer like '%Dell%'" }},
-    @{L     = "LimitingCollection" ; E = { "Laptops | All" }},
-    @{L     = "Comment" ; E = { "All laptops with Dell manufacturer" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Laptops | HP" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_COMPUTER_SYSTEM on SMS_G_System_COMPUTER_SYSTEM.ResourceId = SMS_R_System.ResourceId where SMS_G_System_COMPUTER_SYSTEM.Manufacturer like '%HP%' or SMS_G_System_COMPUTER_SYSTEM.Manufacturer like '%Hewlett-Packard%'" }},
-    @{L     = "LimitingCollection" ; E = { "Laptops | All" }},
-    @{L     = "Comment" ; E = { "All laptops with HP manufacturer" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Laptops | Lenovo" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_COMPUTER_SYSTEM on SMS_G_System_COMPUTER_SYSTEM.ResourceId = SMS_R_System.ResourceId where SMS_G_System_COMPUTER_SYSTEM.Manufacturer like '%Lenovo%'" }},
-    @{L     = "LimitingCollection" ; E = { "Laptops | All" }},
-    @{L     = "Comment" ; E = { "All laptops with Lenovo manufacturer" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Mobile Devices | All" } },
-    @{L     = "Query" ; E = { "select * from SMS_R_System where SMS_R_System.ClientType = 3" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All Mobile Devices" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Mobile Devices | Android" } },
-    @{L     = "Query" ; E = { "$queryBase INNER JOIN SMS_G_System_DEVICE_OSINFORMATION ON SMS_G_System_DEVICE_OSINFORMATION.ResourceID = SMS_R_System.ResourceId WHERE SMS_G_System_DEVICE_OSINFORMATION.Platform like 'Android%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All Android mobile devices" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Mobile Devices | iPhone" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_DEVICE_COMPUTERSYSTEM on SMS_G_System_DEVICE_COMPUTERSYSTEM.ResourceId = SMS_R_System.ResourceId where SMS_G_System_DEVICE_COMPUTERSYSTEM.DeviceModel like '%Iphone%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All iPhone mobile devices" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Mobile Devices | iPad" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_DEVICE_COMPUTERSYSTEM on SMS_G_System_DEVICE_COMPUTERSYSTEM.ResourceId = SMS_R_System.ResourceId where SMS_G_System_DEVICE_COMPUTERSYSTEM.DeviceModel like '%Ipad%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All iPad mobile devices" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Mobile Devices | Windows Phone 8" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_DEVICE_OSINFORMATION on SMS_G_System_DEVICE_OSINFORMATION.ResourceID = SMS_R_System.ResourceId where SMS_G_System_DEVICE_OSINFORMATION.Platform = 'Windows Phone' and SMS_G_System_DEVICE_OSINFORMATION.Version like '8.0%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All Windows 8 mobile devices" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Mobile Devices | Windows Phone 8.1" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_DEVICE_OSINFORMATION on SMS_G_System_DEVICE_OSINFORMATION.ResourceID = SMS_R_System.ResourceId where SMS_G_System_DEVICE_OSINFORMATION.Platform = 'Windows Phone' and SMS_G_System_DEVICE_OSINFORMATION.Version like '8.1%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All Windows 8.1 mobile devices" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Mobile Devices | Windows Phone 10" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_DEVICE_OSINFORMATION on SMS_G_System_DEVICE_OSINFORMATION.ResourceID = SMS_R_System.ResourceId where SMS_G_System_DEVICE_OSINFORMATION.Platform = 'Windows Phone' and SMS_G_System_DEVICE_OSINFORMATION.Version like '10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All Windows Phone 10" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Mobile Devices | Microsoft Surface" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_COMPUTER_SYSTEM on SMS_G_System_COMPUTER_SYSTEM.ResourceId = SMS_R_System.ResourceId where SMS_G_System_COMPUTER_SYSTEM.Model like '%Surface%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All Windows RT mobile devices" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Mobile Devices | Microsoft Surface 3" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_COMPUTER_SYSTEM on SMS_G_System_COMPUTER_SYSTEM.ResourceId = SMS_R_System.ResourceId where SMS_G_System_COMPUTER_SYSTEM.Model = 'Surface Pro 3' OR SMS_G_System_COMPUTER_SYSTEM.Model = 'Surface 3'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All Microsoft Surface 3" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Mobile Devices | Microsoft Surface 4" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_COMPUTER_SYSTEM on SMS_G_System_COMPUTER_SYSTEM.ResourceId = SMS_R_System.ResourceId where SMS_G_System_COMPUTER_SYSTEM.Model = 'Surface Pro 4'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All Microsoft Surface 4" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Others | Linux Devices" } },
-    @{L     = "Query" ; E = { "select * from SMS_R_System where SMS_R_System.ClientEdition = 13" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with Linux" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Others | MAC OSX Devices" } },
-    @{L     = "Query" ; E = { "$queryBase WHERE OperatingSystemNameandVersion LIKE 'Apple Mac OS X%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All workstations with MAC OSX" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "SCCM | Console" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_ADD_REMOVE_PROGRAMS on SMS_G_System_ADD_REMOVE_PROGRAMS.ResourceID = SMS_R_System.ResourceId where SMS_G_System_ADD_REMOVE_PROGRAMS.DisplayName like '%Configuration Manager Console%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM console installed" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "SCCM | Site Servers" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.SystemRoles = 'SMS Site Server'" }},
-    @{L     = "LimitingCollection" ; E = { "Servers | All" }},
-    @{L     = "Comment" ; E = { "All systems that is SCCM site server" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "SCCM | Site Systems" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.SystemRoles = 'SMS Site System' or SMS_R_System.ResourceNames in (Select ServerName FROM SMS_DistributionPointInfo)" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems that is SCCM site system" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "SCCM | Distribution Points" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ResourceNames in (Select ServerName FROM SMS_DistributionPointInfo)" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems that is SCCM distribution point" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Servers | All" } },
-    @{L     = "Query" ; E = { "$queryBase where OperatingSystemNameandVersion like '%Server%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All servers" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Servers | Active" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_CH_ClientSummary on SMS_G_System_CH_ClientSummary.ResourceId = SMS_R_System.ResourceId where SMS_G_System_CH_ClientSummary.ClientActiveStatus = 1 and SMS_R_System.Client = 1 and SMS_R_System.Obsolete = 0" }},
-    @{L     = "LimitingCollection" ; E = { "Servers | All" }},
-    @{L     = "Comment" ; E = { "All servers with active state" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Servers | Physical" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ResourceId not in (select SMS_R_SYSTEM.ResourceID from SMS_R_System inner join SMS_G_System_COMPUTER_SYSTEM on SMS_G_System_COMPUTER_SYSTEM.ResourceId = SMS_R_System.ResourceId where SMS_R_System.IsVirtualMachine = 'True') and SMS_R_System.OperatingSystemNameandVersion
- like 'Microsoft Windows NT%Server%'"}},
-    @{L     = "LimitingCollection" ; E = { "Servers | All" }},
-    @{L     = "Comment" ; E = { "All physical servers" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Servers | Virtual" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.IsVirtualMachine = 'True' and SMS_R_System.OperatingSystemNameandVersion like 'Microsoft Windows NT%Server%'" }},
-    @{L     = "LimitingCollection" ; E = { "Servers | All" }},
-    @{L     = "Comment" ; E = { "All virtual servers" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Servers | Windows 2003 and 2003 R2" } },
-    @{L     = "Query" ; E = { "$queryBase where OperatingSystemNameandVersion like '%Server 5.2%'" }},
-    @{L     = "LimitingCollection" ; E = { "Servers | All" }},
-    @{L     = "Comment" ; E = { "All servers with Windows 2003 or 2003 R2 operating system" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Servers | Windows 2008 and 2008 R2" } },
-    @{L     = "Query" ; E = { "$queryBase where OperatingSystemNameandVersion like '%Server 6.0%' or OperatingSystemNameandVersion like '%Server 6.1%'" }},
-    @{L     = "LimitingCollection" ; E = { "Servers | All" }},
-    @{L     = "Comment" ; E = { "All servers with Windows 2008 or 2008 R2 operating system" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Servers | Windows 2012 and 2012 R2" } },
-    @{L     = "Query" ; E = { "$queryBase where OperatingSystemNameandVersion like '%Server 6.2%' or OperatingSystemNameandVersion like '%Server 6.3%'" }},
-    @{L     = "LimitingCollection" ; E = { "Servers | All" }},
-    @{L     = "Comment" ; E = { "All servers with Windows 2012 or 2012 R2 operating system" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Servers | Windows 2016" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_OPERATING_SYSTEM on SMS_G_System_OPERATING_SYSTEM.ResourceId = SMS_R_System.ResourceId where OperatingSystemNameandVersion like '%Server 10%' and SMS_G_System_OPERATING_SYSTEM.BuildNumber = '14393'" }},
-    @{L     = "LimitingCollection" ; E = { "Servers | All" }},
-    @{L     = "Comment" ; E = { "All Servers with Windows 2016" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Servers | Windows 2019" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_OPERATING_SYSTEM on SMS_G_System_OPERATING_SYSTEM.ResourceId = SMS_R_System.ResourceId where OperatingSystemNameandVersion like '%Server 10%' and SMS_G_System_OPERATING_SYSTEM.BuildNumber = '17763'" }},
-    @{L     = "LimitingCollection" ; E = { "Servers | All" }},
-    @{L     = "Comment" ; E = { "All Servers with Windows 2019" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Software Inventory | Clients Not Reporting since 30 Days" } },
-    @{L     = "Query" ; E = { "$queryBase where ResourceId in (select SMS_R_System.ResourceID from SMS_R_System inner join SMS_G_System_LastSoftwareScan on SMS_G_System_LastSoftwareScan.ResourceId = SMS_R_System.ResourceId where DATEDIFF(dd,SMS_G_System_LastSoftwareScan.LastScanDate,GetDate()) > 30)" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All devices with SCCM client that have not communicated with software inventory over 30 days" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "System Health | Clients Active" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_CH_ClientSummary on SMS_G_System_CH_ClientSummary.ResourceId = SMS_R_System.ResourceId where SMS_G_System_CH_ClientSummary.ClientActiveStatus = 1 and SMS_R_System.Client = 1 and SMS_R_System.Obsolete = 0" }},
-    @{L     = "LimitingCollection" ; E = { "Clients | All" }},
-    @{L     = "Comment" ; E = { "All devices with SCCM client state active" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "System Health | Clients Inactive" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_CH_ClientSummary on SMS_G_System_CH_ClientSummary.ResourceId = SMS_R_System.ResourceId where SMS_G_System_CH_ClientSummary.ClientActiveStatus = 0 and SMS_R_System.Client = 1 and SMS_R_System.Obsolete = 0" }},
-    @{L     = "LimitingCollection" ; E = { "Clients | All" }},
-    @{L     = "Comment" ; E = { "All devices with SCCM client state inactive" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "System Health | Disabled" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.UserAccountControl ='4098'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with client state disabled" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "System Health | Obsolete" } },
-    @{L     = "Query" ; E = { "select * from SMS_R_System where SMS_R_System.Obsolete = 1" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All devices with SCCM client state obsolete" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Systems | x86" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_COMPUTER_SYSTEM on SMS_G_System_COMPUTER_SYSTEM.ResourceID = SMS_R_System.ResourceId where SMS_G_System_COMPUTER_SYSTEM.SystemType = 'X86-based PC'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with 32-bit system type" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Systems | x64" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_COMPUTER_SYSTEM on SMS_G_System_COMPUTER_SYSTEM.ResourceID = SMS_R_System.ResourceId where SMS_G_System_COMPUTER_SYSTEM.SystemType = 'X64-based PC'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with 64-bit system type" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Systems | Created Since 24h" } },
-    @{L     = "Query" ; E = { "select SMS_R_System.Name,SMS_R_System.CreationDate FROM SMS_R_System WHERE DateDiff(dd,SMS_R_System.CreationDate, GetDate()) <= 1" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems created in the last 24 hours" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Windows Update Agent | Outdated Version Win7 RTM and Lower" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_WINDOWSUPDATEAGENTVERSION on SMS_G_System_WINDOWSUPDATEAGENTVERSION.ResourceID = SMS_R_System.ResourceId inner join SMS_G_System_OPERATING_SYSTEM on SMS_G_System_OPERATING_SYSTEM.ResourceID = SMS_R_System.ResourceId where SMS_G_System_WINDOWSUPDATEAGENTVERSION.Version
- < '7.6.7600.256' and SMS_G_System_OPERATING_SYSTEM.Version <= '6.1.7600'"}},
-    @{L     = "LimitingCollection" ; E = { "Workstations | All" }},
-    @{L     = "Comment" ; E = { "All systems with windows update agent with outdated version Win7 RTM and lower" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Windows Update Agent | Outdated Version Win7 SP1 and Higher" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_WINDOWSUPDATEAGENTVERSION on SMS_G_System_WINDOWSUPDATEAGENTVERSION.ResourceID = SMS_R_System.ResourceId inner join SMS_G_System_OPERATING_SYSTEM on SMS_G_System_OPERATING_SYSTEM.ResourceID = SMS_R_System.ResourceId where SMS_G_System_WINDOWSUPDATEAGENTVERSION.Version
- < '7.6.7600.320' and SMS_G_System_OPERATING_SYSTEM.Version >= '6.1.7601'"}},
-    @{L     = "LimitingCollection" ; E = { "Workstations | All" }},
-    @{L     = "Comment" ; E = { "All systems with windows update agent with outdated version Win7 SP1 and higher" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Workstations | All" } },
-    @{L     = "Query" ; E = { "$queryBase where OperatingSystemNameandVersion like '%Workstation%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All workstations" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Workstations | Active" } },
-    @{L     = "Query" ; E = { "$queryBase inner join SMS_G_System_CH_ClientSummary on SMS_G_System_CH_ClientSummary.ResourceId = SMS_R_System.ResourceId where (SMS_R_System.OperatingSystemNameandVersion like 'Microsoft Windows NT%Workstation%' or SMS_R_System.OperatingSystemNameandVersion = 'Windows 7 Entreprise 6.1') and SMS_G_System_CH_ClientSummary.ClientActiveStatus = 1 and SMS_R_System.Client = 1 and SMS_R_System.Obsolete = 0" }},
-    @{L     = "LimitingCollection" ; E = { "Workstations | All" }},
-    @{L     = "Comment" ; E = { "All workstations with active state" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Workstations | Windows 7" } },
-    @{L     = "Query" ; E = { "$queryBase where OperatingSystemNameandVersion like '%Workstation 6.1%'" }},
-    @{L     = "LimitingCollection" ; E = { "Workstations | All" }},
-    @{L     = "Comment" ; E = { "All workstations with Windows 7 operating system" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Workstations | Windows 8" } },
-    @{L     = "Query" ; E = { "$queryBase where OperatingSystemNameandVersion like '%Workstation 6.2%'" }},
-    @{L     = "LimitingCollection" ; E = { "Workstations | All" }},
-    @{L     = "Comment" ; E = { "All workstations with Windows 8 operating system" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Workstations | Windows 8.1" } },
-    @{L     = "Query" ; E = { "$queryBase where OperatingSystemNameandVersion like '%Workstation 6.3%'" }},
-    @{L     = "LimitingCollection" ; E = { "Workstations | All" }},
-    @{L     = "Comment" ; E = { "All workstations with Windows 8.1 operating system" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Workstations | Windows XP" } },
-    @{L     = "Query" ; E = { "$queryBase where OperatingSystemNameandVersion like '%Workstation 5.1%' or OperatingSystemNameandVersion like '%Workstation 5.2%'" }},
-    @{L     = "LimitingCollection" ; E = { "Workstations | All" }},
-    @{L     = "Comment" ; E = { "All workstations with Windows XP operating system" }
-    }
-
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Workstations | Windows 10" } },
-    @{L     = "Query" ; E = { "$queryBase where OperatingSystemNameandVersion like '%Workstation 10.0%'" }},
-    @{L     = "LimitingCollection" ; E = { "Workstations | All" }},
-    @{L     = "Comment" ; E = { "All workstations with Windows 10 operating system" }
-    }
+function New-CollectionClientVersion {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ClientVersion
+    )
+
+    if ($ClientVersion.Contains('%')) {
+        $operator = "like"
+    } else {
+        $operator = "="
+    }
+
+    $clientObj = [PSCustomObject]@{
+        Name               = "CM client version | $($Name)"
+        Query              = "$queryBase where SMS_R_System.ClientVersion $operator '$ClientVersion'"
+        LimitingCollection = $LimitingCollection
+        Comment            = "All systems with CM client version $ClientVersion installed."
+    }
+
+    return $clientObj
+}
+
+function New-CollectionHardware {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$QueryAddition,
+
+        [Parameter(Mandatory = $true)]
+        [string]$LimitingCollection,
+
+        [Parameter()]
+        [string]$Comment
+    )
+
+    $stringQuery = "$queryBase inner join SMS_G_System_COMPUTER_SYSTEM on SMS_G_System_COMPUTER_SYSTEM.ResourceId = SMS_R_System.ResourceId where SMS_G_System_COMPUTER_SYSTEM"
+    $tempObj = [PSCustomObject]@{
+        Name               = $Name
+        Query              = "$stringQuery.$QueryAddition"
+        LimitingCollection = $LimitingCollection
+        Comment            = $Comment
+    }
+
+    <#
+    if ($Model -in "Dell", "HP", "Hewlett-Packard", "Lenovo") {
+        $tempObj.Query += ".Manufacturer like '%$Model%'"
+        if ($Manufacturer -eq "HP") {
+            $tempObj.Query += " or SMS_G_System_COMPUTER_SYSTEM.Manufacturer like '%Hewlett-Packard%'"
+        }
+    } else {
+        $tempObj.Query += " where SMS_G_System_COMPUTER_SYSTEM.Manufacturer = '$Manufacturer' and SMS_G_System_COMPUTER_SYSTEM.Model = '$Model'"
+    }
+#>
+    return $tempObj
+}
+
+# All versions of the ConfigMgr client
+$cmVersions = @(
+    [PSCustomObject]@{
+        Name = "R2 CU1"; ClientVersion = "5.00.7958.1203"
+    },
+    [PSCustomObject]@{
+        Name = "R2 CU2"; ClientVersion = "5.00.7958.1303"
+    },
+    [PSCustomObject]@{
+        Name = "R2 CU3"; ClientVersion = "5.00.7958.14"
+    },
+    [PSCustomObject]@{
+        Name = "R2 CU4"; ClientVersion = "5.00.7958.1501"
+    },
+    [PSCustomObject]@{
+        Name = "R2 CU5"; ClientVersion = "5.00.7958.1604"
+    },
+    [PSCustomObject]@{
+        Name = "R2 CU0"; ClientVersion = "5.00.7958.1000"
+    },
+    [PSCustomObject]@{
+        Name = "R2 SP1"; ClientVersion = "5.00.8239.1000"
+    },
+    [PSCustomObject]@{
+        Name = "R2 SP1 CU1"; ClientVersion = "5.00.8239.1203"
+    },
+    [PSCustomObject]@{
+        Name = "R2 SP1 CU2"; ClientVersion = "5.00.8239.1301"
+    },
+    [PSCustomObject]@{
+        Name = "R2 SP1 CU3"; ClientVersion = "5.00.8239.1403"
+    },
+    [PSCustomObject]@{
+        Name = "1511"; ClientVersion = "5.00.8325.1000"
+    },
+    [PSCustomObject]@{
+        Name = "1602"; ClientVersion = "5.00.8355.1000"
+    },
+    [PSCustomObject]@{
+        Name = "1606"; ClientVersion = "5.00.8412.1000"
+    },
+    [PSCustomObject]@{
+        Name = "1610"; ClientVersion = "5.00.8458.1000"
+    },
+    [PSCustomObject]@{
+        Name = "1702"; ClientVersion = "5.00.8498.1000"
+    },
+    [PSCustomObject]@{
+        Name = "1706"; ClientVersion = "5.00.8540.1000"
+    },
+    [PSCustomObject]@{
+        Name = "1710"; ClientVersion = "5.00.8577.1000"
+    }
+    [PSCustomObject]@{
+        Name = "1802"; ClientVersion = '5.00.8634.10%'
+    }
+    [PSCustomObject]@{
+        Name = "1806"; ClientVersion = '5.00.8692.10%'
+    }
+    [PSCustomObject]@{
+        Name = "1810"; ClientVersion = '5.00.8740.10%'
+    }
+    [PSCustomObject]@{
+        Name = "1902"; ClientVersion = '5.00.8790.10%'
+    }
+    [PSCustomObject]@{
+        Name = "1906"; ClientVersion = '5.00.8853.10%'
+    }
+    [PSCustomObject]@{
+        Name = "1910"; ClientVersion = '5.00.8913.10%'
+    }
+    [PSCustomObject]@{
+        Name = "2002"; ClientVersion = '5.00.8968.10%'
+    }
+    [PSCustomObject]@{
+        Name = "2006"; ClientVersion = '5.00.9012.10%'
+    }
+    [PSCustomObject]@{
+        Name = "2010"; ClientVersion = '5.00.9040.10%'
+    }
+    [PSCustomObject]@{
+        Name = "2103"; ClientVersion = '5.00.9049.10%'
+    }
+    [PSCustomObject]@{
+        Name = "2107"; ClientVersion = '5.00.9058.10%'
+    }
+    [PSCustomObject]@{
+        Name = "2111"; ClientVersion = '5.00.9068.10%'
+    }
+    [PSCustomObject]@{
+        Name = "2203"; ClientVersion = '5.00.9078.10%'
+    }
+    [PSCustomObject]@{
+        Name = "2207"; ClientVersion = '5.00.9088.10%'
+    }
+    [PSCustomObject]@{
+        Name = "2303"; ClientVersion = '5.00.9106.10%'
+    }
+    [PSCustomObject]@{
+        Name = "2309"; ClientVersion = '5.00.9120.10%'
+    }
+    [PSCustomObject]@{
+        Name = "2403"; ClientVersion = '5.00.9128.10%'
+    }
+)
+
+# Create client version collections
+foreach ($cmVersion in $cmVersions) {
+    $Collections += New-CollectionClientVersion -Name $cmVersion.Name -ClientVersion $cmVersion.ClientVersion
+}
+
+# All devices with CM client installed
+$Collections += [PSCustomObject]@{
+    Name               = "Clients | All"
+    Query              = "$queryBase where SMS_R_System.Client = 1"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All devices detected by CM."
+}
+
+# All devices without CM client
+$Collections += [PSCustomObject]@{
+    Name               = "Clients | No"
+    Query              = "$queryBase where SMS_R_System.Client = 0 OR SMS_R_System.Client is NULL"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All devices without CM client installed."
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Clients Version | Not Latest (2207)"
+    Query              = "$queryBase where SMS_R_System.ClientVersion not like '5.00.9088.10%'"
+    LimitingCollection = "Clients | All"
+    Comment            = "All devices without CM client version 2207."
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Hardware Inventory | Clients not reporting last 14 days"
+    Query              = "$queryBase where ResourceId in (select SMS_R_System.ResourceID from SMS_R_System inner join SMS_G_System_WORKSTATION_STATUS on SMS_G_System_WORKSTATION_STATUS.ResourceID = SMS_R_System.ResourceId where DATEDIFF(dd,SMS_G_System_WORKSTATION_STATUS.LastHardwareScan,GetDate()) > 14)"
+    LimitingCollection = "Clients | All"
+    Comment            = "All devices with CM client that have not communicated with hardware inventory over 14 days."
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Laptops | All"
+    Query              = "$queryBase inner join SMS_G_System_SYSTEM_ENCLOSURE on SMS_G_System_SYSTEM_ENCLOSURE.ResourceID = SMS_R_System.ResourceId where SMS_G_System_SYSTEM_ENCLOSURE.ChassisTypes in ('8', '9', '10', '11', '12', '14', '18', '21')"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All laptops."
+}
+
+$Collections += New-CollectionHardware -Name "Laptops | Dell" -QueryAddition "Manufacturer like '%Dell%'" -LimitingCollection "Laptops | All" -Comment "All laptops with Dell manufacturer."
+$Collections += New-CollectionHardware -Name "Laptops | Lenovo" -QueryAddition "Manufacturer like '%Lenovo%'" -LimitingCollection "Laptops | All" -Comment "All laptops with Lenovo manufacturer."
+$Collections += New-CollectionHardware -Name "Laptops | HP" -QueryAddition "Manufacturer like '%HP%' or SMS_G_System_COMPUTER_SYSTEM.Manufacturer like '%Hewlett-Packard%'" -LimitingCollection "Laptops | All" -Comment "All laptops with HP manufacturer."
+
+$Collections += [PSCustomObject]@{
+    Name               = "Mobile Devices | All"
+    Query              = "select * from SMS_R_System where SMS_R_System.ClientType = 3"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All Mobile Devices."
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Mobile Devices | Android"
+    Query              = "$queryBase INNER JOIN SMS_G_System_DEVICE_OSINFORMATION ON SMS_G_System_DEVICE_OSINFORMATION.ResourceID = SMS_R_System.ResourceId WHERE SMS_G_System_DEVICE_OSINFORMATION.Platform like 'Android%'"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All Android mobile devices."
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Mobile Devices | iPhone"
+    Query              = "$queryBase inner join SMS_G_System_DEVICE_COMPUTERSYSTEM on SMS_G_System_DEVICE_COMPUTERSYSTEM.ResourceId = SMS_R_System.ResourceId where SMS_G_System_DEVICE_COMPUTERSYSTEM.DeviceModel like '%Iphone%'"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All iPhone mobile devices."
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Mobile Devices | iPad"
+    Query              = "$queryBase inner join SMS_G_System_DEVICE_COMPUTERSYSTEM on SMS_G_System_DEVICE_COMPUTERSYSTEM.ResourceId = SMS_R_System.ResourceId where SMS_G_System_DEVICE_COMPUTERSYSTEM.DeviceModel like '%Ipad%'"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All iPad mobile devices"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Mobile Devices | Windows Phone 8"
+    Query              = "$queryBase inner join SMS_G_System_DEVICE_OSINFORMATION on SMS_G_System_DEVICE_OSINFORMATION.ResourceID = SMS_R_System.ResourceId where SMS_G_System_DEVICE_OSINFORMATION.Platform = 'Windows Phone' and SMS_G_System_DEVICE_OSINFORMATION.Version like '8.0%'"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All Windows 8 mobile devices"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Mobile Devices | Windows Phone 8.1"
+    Query              = "$queryBase inner join SMS_G_System_DEVICE_OSINFORMATION on SMS_G_System_DEVICE_OSINFORMATION.ResourceID = SMS_R_System.ResourceId where SMS_G_System_DEVICE_OSINFORMATION.Platform = 'Windows Phone' and SMS_G_System_DEVICE_OSINFORMATION.Version like '8.1%'"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All Windows 8.1 mobile devices"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Mobile Devices | Windows Phone 10"
+    Query              = "$queryBase inner join SMS_G_System_DEVICE_OSINFORMATION on SMS_G_System_DEVICE_OSINFORMATION.ResourceID = SMS_R_System.ResourceId where SMS_G_System_DEVICE_OSINFORMATION.Platform = 'Windows Phone' and SMS_G_System_DEVICE_OSINFORMATION.Version like '10%'"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All Windows Phone 10"
+}
+$Collections += New-CollectionHardware -Name "Mobile Devices | Microsoft Surface" -QueryAddition "Model like '%Surface%'" -LimitingCollection $LimitingCollection -Comment "All Windows RT mobile devices."
+$Collections += New-CollectionHardware -Name "Mobile Devices | Microsoft Surface 3" -QueryAddition "Model = 'Surface Pro 3' OR SMS_G_System_COMPUTER_SYSTEM.Model = 'Surface 3'" -LimitingCollection $LimitingCollection -Comment "All Microsoft Surface 3."
+$Collections += New-CollectionHardware -Name "Mobile Devices | Microsoft Surface 4" -QueryAddition "Model = 'Surface Pro 4'" -LimitingCollection $LimitingCollection -Comment "All Microsoft Surface 4."
+
+$Collections += [PSCustomObject]@{
+    Name               = "Others | Linux Devices"
+    Query              = "select * from SMS_R_System where SMS_R_System.ClientEdition = 13"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All systems with Linux"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Others | MAC OSX Devices"
+    Query              = "$queryBase WHERE OperatingSystemNameandVersion LIKE 'Apple Mac OS X%'"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All workstations with MAC OSX"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "CM | Console"
+    Query              = "$queryBase inner join SMS_G_System_ADD_REMOVE_PROGRAMS on SMS_G_System_ADD_REMOVE_PROGRAMS.ResourceID = SMS_R_System.ResourceId where SMS_G_System_ADD_REMOVE_PROGRAMS.DisplayName like '%Configuration Manager Console%'"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All systems with CM console installed"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "CM | Site Servers"
+    Query              = "$queryBase where SMS_R_System.SystemRoles = 'SMS Site Server'"
+    LimitingCollection = "Servers | All"
+    Comment            = "All systems that is CM site server"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "CM | Site Systems"
+    Query              = "$queryBase where SMS_R_System.SystemRoles = 'SMS Site System' or SMS_R_System.ResourceNames in (Select ServerName FROM SMS_DistributionPointInfo)"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All systems that is CM site system"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "CM | Distribution Points"
+    Query              = "$queryBase where SMS_R_System.ResourceNames in (Select ServerName FROM SMS_DistributionPointInfo)"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All systems that is CM distribution point"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Servers | All"
+    Query              = "$queryBase where OperatingSystemNameandVersion like '%Server%'"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All servers"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Servers | Active"
+    Query              = "$queryBase inner join SMS_G_System_CH_ClientSummary on SMS_G_System_CH_ClientSummary.ResourceId = SMS_R_System.ResourceId where SMS_G_System_CH_ClientSummary.ClientActiveStatus = 1 and SMS_R_System.Client = 1 and SMS_R_System.Obsolete = 0"
+    LimitingCollection = "Servers | All"
+    Comment            = "All servers with active state"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Servers | Physical"
+    Query              = "$queryBase where SMS_R_System.ResourceId not in (select SMS_R_SYSTEM.ResourceID from SMS_R_System inner join SMS_G_System_COMPUTER_SYSTEM on SMS_G_System_COMPUTER_SYSTEM.ResourceId = SMS_R_System.ResourceId where SMS_R_System.IsVirtualMachine = 'True') and SMS_R_System.OperatingSystemNameandVersion
+ like 'Microsoft Windows NT%Server%'"
+    LimitingCollection = "Servers | All"
+    Comment            = "All physical servers"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Servers | Virtual"
+    Query              = "$queryBase where SMS_R_System.IsVirtualMachine = 'True' and SMS_R_System.OperatingSystemNameandVersion like 'Microsoft Windows NT%Server%'"
+    LimitingCollection = "Servers | All"
+    Comment            = "All virtual servers"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Servers | Windows 2003 and 2003 R2"
+    Query              = "$queryBase where OperatingSystemNameandVersion like '%Server 5.2%'"
+    LimitingCollection = "Servers | All"
+    Comment            = "All servers with Windows 2003 or 2003 R2 operating system"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Servers | Windows 2008 and 2008 R2"
+    Query              = "$queryBase where OperatingSystemNameandVersion like '%Server 6.0%' or OperatingSystemNameandVersion like '%Server 6.1%'"
+    LimitingCollection = "Servers | All"
+    Comment            = "All servers with Windows 2008 or 2008 R2 operating system"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Servers | Windows 2012 and 2012 R2"
+    Query              = "$queryBase where OperatingSystemNameandVersion like '%Server 6.2%' or OperatingSystemNameandVersion like '%Server 6.3%'"
+    LimitingCollection = "Servers | All"
+    Comment            = "All servers with Windows 2012 or 2012 R2 operating system"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Servers | Windows 2016"
+    Query              = "$queryBase inner join SMS_G_System_OPERATING_SYSTEM on SMS_G_System_OPERATING_SYSTEM.ResourceId = SMS_R_System.ResourceId where OperatingSystemNameandVersion like '%Server 10%' and SMS_G_System_OPERATING_SYSTEM.BuildNumber = '14393'"
+    LimitingCollection = "Servers | All"
+    Comment            = "All Servers with Windows 2016"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Servers | Windows 2019"
+    Query              = "$queryBase inner join SMS_G_System_OPERATING_SYSTEM on SMS_G_System_OPERATING_SYSTEM.ResourceId = SMS_R_System.ResourceId where OperatingSystemNameandVersion like '%Server 10%' and SMS_G_System_OPERATING_SYSTEM.BuildNumber = '17763'"
+    LimitingCollection = "Servers | All"
+    Comment            = "All Servers with Windows 2019"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Software Inventory | Clients Not Reporting since 30 Days"
+    Query              = "$queryBase where ResourceId in (select SMS_R_System.ResourceID from SMS_R_System inner join SMS_G_System_LastSoftwareScan on SMS_G_System_LastSoftwareScan.ResourceId = SMS_R_System.ResourceId where DATEDIFF(dd,SMS_G_System_LastSoftwareScan.LastScanDate,GetDate()) > 30)"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All devices with CM client that have not communicated with software inventory over 30 days"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "System Health | Clients Active"
+    Query              = "$queryBase inner join SMS_G_System_CH_ClientSummary on SMS_G_System_CH_ClientSummary.ResourceId = SMS_R_System.ResourceId where SMS_G_System_CH_ClientSummary.ClientActiveStatus = 1 and SMS_R_System.Client = 1 and SMS_R_System.Obsolete = 0"
+    LimitingCollection = "Clients | All"
+    Comment            = "All devices with CM client state active"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "System Health | Clients Inactive"
+    Query              = "$queryBase inner join SMS_G_System_CH_ClientSummary on SMS_G_System_CH_ClientSummary.ResourceId = SMS_R_System.ResourceId where SMS_G_System_CH_ClientSummary.ClientActiveStatus = 0 and SMS_R_System.Client = 1 and SMS_R_System.Obsolete = 0"
+    LimitingCollection = "Clients | All"
+    Comment            = "All devices with CM client state inactive"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "System Health | Disabled"
+    Query              = "$queryBase where SMS_R_System.UserAccountControl ='4098'"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All systems with client state disabled"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "System Health | Obsolete"
+    Query              = "select * from SMS_R_System where SMS_R_System.Obsolete = 1"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All devices with CM client state obsolete"
+}
+$Collections += [PSCustomObject]@{
+    Name               = "Systems | x86"
+    Query              = "$queryBase inner join SMS_G_System_COMPUTER_SYSTEM on SMS_G_System_COMPUTER_SYSTEM.ResourceID = SMS_R_System.ResourceId where SMS_G_System_COMPUTER_SYSTEM.SystemType = 'X86-based PC'"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All systems with 32-bit system type"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Systems | x64"
+    Query              = "$queryBase inner join SMS_G_System_COMPUTER_SYSTEM on SMS_G_System_COMPUTER_SYSTEM.ResourceID = SMS_R_System.ResourceId where SMS_G_System_COMPUTER_SYSTEM.SystemType = 'X64-based PC'"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All systems with 64-bit system type"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Systems | Created Since 24h"
+    Query              = "select SMS_R_System.Name,SMS_R_System.CreationDate FROM SMS_R_System WHERE DateDiff(dd,SMS_R_System.CreationDate, GetDate()) <= 1"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All systems created in the last 24 hours"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Windows Update Agent | Outdated Version Win7 RTM and Lower"
+    Query              = "$queryBase inner join SMS_G_System_WINDOWSUPDATEAGENTVERSION on SMS_G_System_WINDOWSUPDATEAGENTVERSION.ResourceID = SMS_R_System.ResourceId inner join SMS_G_System_OPERATING_SYSTEM on SMS_G_System_OPERATING_SYSTEM.ResourceID = SMS_R_System.ResourceId where SMS_G_System_WINDOWSUPDATEAGENTVERSION.Version
+ < '7.6.7600.256' and SMS_G_System_OPERATING_SYSTEM.Version <= '6.1.7600'"
+    LimitingCollection = "Workstations | All"
+    Comment            = "All systems with windows update agent with outdated version Win7 RTM and lower"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Windows Update Agent | Outdated Version Win7 SP1 and Higher"
+    Query              = "$queryBase inner join SMS_G_System_WINDOWSUPDATEAGENTVERSION on SMS_G_System_WINDOWSUPDATEAGENTVERSION.ResourceID = SMS_R_System.ResourceId inner join SMS_G_System_OPERATING_SYSTEM on SMS_G_System_OPERATING_SYSTEM.ResourceID = SMS_R_System.ResourceId where SMS_G_System_WINDOWSUPDATEAGENTVERSION.Version
+ < '7.6.7600.320' and SMS_G_System_OPERATING_SYSTEM.Version >= '6.1.7601'"
+    LimitingCollection = "Workstations | All"
+    Comment            = "All systems with windows update agent with outdated version Win7 SP1 and higher"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Workstations | All"
+    Query              = "$queryBase where OperatingSystemNameandVersion like 'Microsoft Windows NT Workstation%'"
+    LimitingCollection = $LimitingCollection
+    Comment            = "All workstations"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Workstations | Active"
+    Query              = "$queryBase inner join SMS_G_System_CH_ClientSummary on SMS_G_System_CH_ClientSummary.ResourceId = SMS_R_System.ResourceId where (SMS_R_System.OperatingSystemNameandVersion like 'Microsoft Windows NT Workstation%' or SMS_R_System.OperatingSystemNameandVersion = 'Windows 7 Enterprise 6.1') and SMS_G_System_CH_ClientSummary.ClientActiveStatus = 1 and SMS_R_System.Client = 1 and SMS_R_System.Obsolete = 0"
+    LimitingCollection = "Workstations | All"
+    Comment            = "All workstations with active state"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Workstations | Windows 7"
+    Query              = "$queryBase where OperatingSystemNameandVersion like 'Microsoft Windows NT Workstation 6.1%'"
+    LimitingCollection = "Workstations | All"
+    Comment            = "All workstations with Windows 7 operating system"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Workstations | Windows 8"
+    Query              = "$queryBase where OperatingSystemNameandVersion like 'Microsoft Windows NT Workstation 6.2%'"
+    LimitingCollection = "Workstations | All"
+    Comment            = "All workstations with Windows 8 operating system"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Workstations | Windows 8.1"
+    Query              = "$queryBase where OperatingSystemNameandVersion like 'Microsoft Windows NT Workstation 6.3%'"
+    LimitingCollection = "Workstations | All"
+    Comment            = "All workstations with Windows 8.1 operating system"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Workstations | Windows XP"
+    Query              = "$queryBase where OperatingSystemNameandVersion like 'Microsoft Windows NT Workstation 5.1%' or OperatingSystemNameandVersion like 'Microsoft Windows NT Workstation 5.2%'"
+    LimitingCollection = "Workstations | All"
+    Comment            = "All workstations with Windows XP operating system"
+}
+
+$Collections += [PSCustomObject]@{
+    Name               = "Workstations | Windows 10"
+    Query              = "$queryBase where OperatingSystemNameandVersion like 'Microsoft Windows NT Workstation 10.0%' and Build like '10.0.19%'"
+    LimitingCollection = "Workstations | All"
+    Comment            = "All workstations with Windows 10 operating system"
+}
 
 $Collections +=
 $DummyObject |
@@ -696,10 +650,10 @@ $DummyObject |
 
 $Collections +=
 $DummyObject |
-    Select-Object @{L = "Name" ; E = { "Workstations | Windows 10 Support State - Expired Soon" } },
+    Select-Object @{L = "Name" ; E = { "Workstations | Windows 10 Support State - Expires Soon" } },
     @{L     = "Query" ; E = { "$queryBase LEFT OUTER JOIN SMS_WindowsServicingStates ON SMS_WindowsServicingStates.Build = SMS_R_System.build01 AND SMS_WindowsServicingStates.branch = SMS_R_System.osbranch01 where SMS_WindowsServicingStates.State = '3'" }},
     @{L     = "LimitingCollection" ; E = { "Workstations | Windows 10" }},
-    @{L     = "Comment" ; E = { "Windows 10 Support State - Expired Soon" }
+    @{L     = "Comment" ; E = { "Windows 10 Support State - Expires Soon" }
     }
 
 $Collections +=
@@ -710,14 +664,6 @@ $DummyObject |
     @{L     = "Comment" ; E = { "Windows 10 Support State - Expired" }
     }
 
-##Collection 77
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 1802" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.8634.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version 1802 installed" }
-    }
 
 ##Collection 78
 $Collections +=
@@ -809,30 +755,6 @@ $DummyObject |
     @{L     = "Comment" ; E = { "Office 365 Channel | Semi-Annual" }
     }
 
-##Collection 88
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 1806" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.8692.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment" ; E = { "All systems with SCCM client version 1806 installed" }
-    }
-
-##Collection 89
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 1810" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.8740.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment"; E = { "All systems with SCCM client version 1810 installed" } }
-
-##Collection 90
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 1902" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.8790.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment"; E = { "All systems with SCCM client version 1902 installed" } }
 
 ##Collection 91
 $Collections +=
@@ -841,14 +763,6 @@ $DummyObject |
     @{L     = "Query" ; E = { "select R.ResourceID,R.ResourceType,R.Name,R.SMSUniqueIdentifier,R.ResourceDomainORWorkgroup,R.Client from SMS_R_System as r full join SMS_R_System as s1 on s1.ResourceId = r.ResourceId full join SMS_R_System as s2 on s2.Name = s1.Name where s1.Name = s2.Name and s1.ResourceId != s2.ResourceId" }},
     @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
     @{L     = "Comment"; E = { "All systems having a duplicate device record" } }
-
-##Collection 92
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 1906" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.8853.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment"; E = { "All systems with SCCM client version 1906 installed" } }
 
 ##Collection 93
 $Collections +=
@@ -867,14 +781,6 @@ $DummyObject |
     @{L     = "LimitingCollection" ; E = { "Workstations | Windows 10" }},
     @{L     = "Comment" ; E = { "Workstations | Windows 10 v1903" }
     }
-
-##Collection 95
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 1910" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.8913.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment"; E = { "All systems with SCCM client version 1910 installed" } }
 
 ##Collection 96
 $Collections +=
@@ -923,45 +829,6 @@ $DummyObject |
 
 
 ################################# November 22th 2021 ###############################
-##Collection 101
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 2002" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.8968.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment"; E = { "All systems with SCCM client version 2002 installed" } }
-
-##Collection 102
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 2006" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.9012.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L = "Comment"; E = { "All systems with SCCM client version 2006 installed" } }
-
-##Collection 103
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 2010" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.9040.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment"; E = { "All systems with SCCM client version 2010 installed" } }
-
-##Collection 104
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 2103" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.9049.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment"; E = { "All systems with SCCM client version 2103 installed" } }
-
-##Collection 105
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 2107" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.9058.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment"; E = { "All systems with SCCM client version 2107 installed" } }
 
 
 ##Collection 106
@@ -1299,37 +1166,13 @@ $DummyObject |
     @{L     = "Comment" ; E = { "Office 365 Build Version | 2207" }
     }
 
-##Collection 143
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 2111" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.9068.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment"; E = { "All systems with SCCM client version 2111 installed" } }
-
-##Collection 144
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 2203" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.9078.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L = "Comment"; E = { "All systems with SCCM client version 2203 installed" } }
-
-##Collection 145
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 2207" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.9088.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment"; E = { "All systems with SCCM client version 2207 installed" } }
-
 ##Collection 146
 $Collections +=
 $DummyObject |
     Select-Object @{L = "Name" ; E = { "Workstations | Co-Management Enabled" } },
     @{L     = "Query" ; E = { "$queryBase inner join SMS_Client_ComanagementState on SMS_Client_ComanagementState.ResourceId = SMS_R_System.ResourceId where SMS_Client_ComanagementState.ComgmtPolicyPresent = 1 AND SMS_Client_ComanagementState.MDMEnrolled = 1 AND MDMProvisioned = 1" }},
     @{L     = "LimitingCollection" ; E = { "Workstations | All" }},
-    @{L     = "Comment"; E = { "All workstations with SCCM client with Co-Management Enabled" } }
+    @{L     = "Comment"; E = { "All workstations with CM client with Co-Management Enabled" } }
 
 ##Collection 147
 $Collections +=
@@ -1337,7 +1180,7 @@ $DummyObject |
     Select-Object @{L = "Name" ; E = { "Workstations | Defender ATP Onboarded" } },
     @{L     = "Query" ; E = { "select * from SMS_R_System inner join SMS_G_System_AdvancedThreatProtectionHealthStatus on SMS_G_System_AdvancedThreatProtectionHealthStatus.ResourceId = SMS_R_System.ResourceId where SMS_G_System_AdvancedThreatProtectionHealthStatus.OnboardingState = 1" }},
     @{L     = "LimitingCollection" ; E = { "Workstations | All" }},
-    @{L     = "Comment"; E = { "All workstations with SCCM client with Defender ATP Onboarded" } }
+    @{L     = "Comment"; E = { "All workstations with CM client with Defender ATP Onboarded" } }
 
 ##Collection 148
 $Collections +=
@@ -1345,31 +1188,8 @@ $DummyObject |
     Select-Object @{L = "Name" ; E = { "Workstations | Defender ATP Not Onboarded" } },
     @{L     = "Query" ; E = { "select * from SMS_R_System inner join SMS_G_System_AdvancedThreatProtectionHealthStatus on SMS_G_System_AdvancedThreatProtectionHealthStatus.ResourceId = SMS_R_System.ResourceId where SMS_G_System_AdvancedThreatProtectionHealthStatus.OnboardingState = 0" }},
     @{L     = "LimitingCollection" ; E = { "Workstations | All" }},
-    @{L     = "Comment"; E = { "All workstations with SCCM client with Defender ATP Not Onboarded" } }
+    @{L     = "Comment"; E = { "All workstations with CM client with Defender ATP Not Onboarded" } }
 
-##Collection 149
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 2303" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.9106.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment"; E = { "All systems with SCCM client version 2303 installed" } }
-
-##Collection 150
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 2309" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.9120.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment"; E = { "All systems with SCCM client version 2309 installed" } }
-
-##Collection 151
-$Collections +=
-$DummyObject |
-    Select-Object @{L = "Name" ; E = { "Clients Version | 2403" } },
-    @{L     = "Query" ; E = { "$queryBase where SMS_R_System.ClientVersion like '5.00.9128.10%'" }},
-    @{L     = "LimitingCollection" ; E = { $LimitingCollection }},
-    @{L     = "Comment"; E = { "All systems with SCCM client version 2403 installed" } }
 
 ##Collection 152
 $Collections +=
@@ -1422,7 +1242,7 @@ If ($ErrorCount -ge 1) {
 }
 
 #Create Collection And Move the collection to the right folder
-If ($Overwrite -eq "y") {
+If ($Overwrite -ieq "y") {
     $ErrorCount = 0
 
     ForEach ($Collection In $($Collections | Sort-Object LimitingCollection -Descending)) {
