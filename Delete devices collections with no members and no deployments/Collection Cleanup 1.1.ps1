@@ -5,7 +5,7 @@
 #
 # Version : 1.1
 # Created : 2017/04/05
-# Modified : 2024/11/16 - Baard Hermansen
+# Modified : 2024/11/24 - Baard Hermansen
 #
 # Purpose : This script delete collections without members and deployments
 #
@@ -24,29 +24,31 @@ Write-Host "--------------------------------------------------------------------
 Write-Host "Building Devices Collections List. This may take a couple of minutes..."
 Write-Host "------------------------------------------------------------------------`n"
 
-$CollectionList = Get-CmDeviceCollection | Where-Object { $_.CollectionID -notlike 'SMS*' -and $_.MemberCount -eq 0 } | Select-Object -Property Name, MemberCount, CollectionID, IsReferenceCollection
+[array]$CollectionList = Get-CmDeviceCollection | Where-Object { $_.CollectionID -notlike 'SMS*' -and $_.MemberCount -eq 0 } | Select-Object -Property Name, MemberCount, CollectionID#, IsReferenceCollection
 
-Write-Host "Found " + $CollectionList.Count + " collections without members (MemberCount = 0). `n"
-Write-Host "Analyzing list to find collections without deployments... `n"
+"Found {0} collections without members (MemberCount = 0). `n" -f $CollectionList.Count
+"Analyzing list to find collections without deployments... `n"
 
 foreach ($Collection in $CollectionList) {
     $CollectionID = $Collection.CollectionID
-    $GetDeployment = Get-CMDeployment -CollectionName $Collection.Name
+    #$GetDeployment = Get-CMDeployment -CollectionName $Collection.Name
 
     # Delete collection if there's no members and no deployment on the collection
-    If ($null -eq $GetDeployment) {
-        Write-Host "Collection " + $Collection.Name + " with ID " + $CollectionID + " has no members and deployments."
+    #If ($null -eq $GetDeployment) {
+    If ($null -eq (Get-CMDeployment -CollectionName $Collection.Name)) {
+        "Collection '{0}' with ID {1} has no members and deployments." -f $Collection.Name, $CollectionID
 
         # User Confirmation
         If ((Read-Host -Prompt "Type `"Y`" to delete the collection, any other key to skip") -ieq "y") {
             #Check if Reference collection
+            ## There is no check here...
             Try {
                 # Delete the collection object
                 Remove-CMCollection -Id $CollectionID -Force
-                Write-Host -ForegroundColor Green ("Collection: " + $Collection.Name + " deleted.")
+                Write-Host -ForegroundColor Green "Collection '$($Collection.Name)' deleted."
             }
             Catch {
-                Write-Host -ForegroundColor Red "Failed to delete " + $Collection.Name + " collection!"
+                Write-Host -ForegroundColor Red "Failed to delete '$($Collection.Name)' collection!"
                 Write-Host -ForegroundColor Red "Error: " + $_.Exception.Message
             }
         }
